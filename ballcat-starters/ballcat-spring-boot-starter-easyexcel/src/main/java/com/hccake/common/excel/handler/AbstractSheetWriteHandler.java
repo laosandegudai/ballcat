@@ -9,8 +9,10 @@ import com.hccake.common.excel.annotation.ResponseExcel;
 import com.hccake.common.excel.aop.DynamicNameAspect;
 import com.hccake.common.excel.converters.LocalDateStringConverter;
 import com.hccake.common.excel.converters.LocalDateTimeStringConverter;
+import com.hccake.common.excel.head.HeadGenerator;
 import com.hccake.common.excel.kit.ExcelException;
 import lombok.SneakyThrows;
+import org.springframework.beans.BeanUtils;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.StringUtils;
@@ -27,6 +29,7 @@ import java.util.Objects;
 
 /**
  * @author lengleng
+ * @author L.cm
  * @date 2020/3/31
  */
 public abstract class AbstractSheetWriteHandler implements SheetWriteHandler {
@@ -45,18 +48,15 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler {
 	@Override
 	@SneakyThrows
 	public void export(Object o, HttpServletResponse response, ResponseExcel responseExcel) {
-		if (support(o)) {
-			check(responseExcel);
-			RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
-			String name = (String) Objects.requireNonNull(requestAttributes)
-					.getAttribute(DynamicNameAspect.EXCEL_NAME_KEY, RequestAttributes.SCOPE_REQUEST);
-			String fileName = String.format("%s%s", URLEncoder.encode(name, "UTF-8"),
-					responseExcel.suffix().getValue());
-			response.setContentType("application/vnd.ms-excel");
-			response.setCharacterEncoding("utf-8");
-			response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + fileName);
-			write(o, response, responseExcel);
-		}
+		check(responseExcel);
+		RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+		String name = (String) Objects.requireNonNull(requestAttributes).getAttribute(DynamicNameAspect.EXCEL_NAME_KEY,
+				RequestAttributes.SCOPE_REQUEST);
+		String fileName = String.format("%s%s", URLEncoder.encode(name, "UTF-8"), responseExcel.suffix().getValue());
+		response.setContentType("application/vnd.ms-excel");
+		response.setCharacterEncoding("utf-8");
+		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + fileName);
+		write(o, response, responseExcel);
 	}
 
 	/**
@@ -70,10 +70,19 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler {
 	@SneakyThrows
 	public ExcelWriter getExcelWriter(HttpServletResponse response, ResponseExcel responseExcel, List list,
 			String templatePath) {
-		ExcelWriterBuilder writerBuilder = EasyExcel.write(response.getOutputStream(), list.get(0).getClass())
+		// 数据类型
+		Class<?> dataClass = list.get(0).getClass();
+		ExcelWriterBuilder writerBuilder = EasyExcel.write(response.getOutputStream(), dataClass)
 				.registerConverter(LocalDateStringConverter.INSTANCE)
 				.registerConverter(LocalDateTimeStringConverter.INSTANCE).autoCloseStream(true)
 				.excelType(responseExcel.suffix()).inMemory(responseExcel.inMemory());
+
+		// Excel头信息增强
+		Class<? extends HeadGenerator> headEnhancerClass = responseExcel.headGenerator();
+		if (!headEnhancerClass.isInterface()) {
+			HeadGenerator headGenerator = BeanUtils.instantiateClass(headEnhancerClass);
+			writerBuilder.head(headGenerator.head(writerBuilder, dataClass));
+		}
 
 		if (StringUtils.hasText(responseExcel.password())) {
 			writerBuilder.password(responseExcel.password());
@@ -89,13 +98,16 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler {
 
 		if (responseExcel.writeHandler().length != 0) {
 			for (Class<? extends WriteHandler> clazz : responseExcel.writeHandler()) {
-				writerBuilder.registerWriteHandler(clazz.newInstance());
+				writerBuilder.registerWriteHandler(BeanUtils.instantiateClass(clazz));
 			}
 		}
 
+		// 自定义注入的转换器
+		registerCustomConverter(writerBuilder);
+
 		if (responseExcel.converter().length != 0) {
 			for (Class<? extends Converter> clazz : responseExcel.converter()) {
-				writerBuilder.registerConverter(clazz.newInstance());
+				writerBuilder.registerConverter(BeanUtils.instantiateClass(clazz));
 			}
 		}
 
@@ -107,6 +119,14 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler {
 		}
 
 		return writerBuilder.build();
+	}
+
+	/**
+	 * 自定义注入转换器 如果有需要，子类自己重写
+	 * @param builder ExcelWriterBuilder
+	 */
+	public void registerCustomConverter(ExcelWriterBuilder builder) {
+		// do nothing
 	}
 
 }

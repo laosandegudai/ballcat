@@ -1,12 +1,11 @@
 package com.hccake.ballcat.admin.modules.sys.model.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.baomidou.mybatisplus.extension.activerecord.Model;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -17,17 +16,16 @@ import java.time.LocalDateTime;
  */
 @Data
 @TableName("sys_user")
-@EqualsAndHashCode(callSuper = true)
 @ApiModel(value = "系统用户表")
-public class SysUser extends Model<SysUser> {
+public class SysUser implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * 主键id
+	 * 用户ID
 	 */
 	@TableId
-	@ApiModelProperty(value = "主键id")
+	@ApiModelProperty(value = "用户ID")
 	private Integer userId;
 
 	/**
@@ -84,6 +82,15 @@ public class SysUser extends Model<SysUser> {
 	@ApiModelProperty(value = "状态(1-正常, 0-冻结)")
 	private Integer status;
 
+	/**
+	 * 组织机构ID
+	 */
+	@ApiModelProperty(value = "组织机构ID")
+	private Integer organizationId;
+
+	/**
+	 * 用户类型
+	 */
 	@ApiModelProperty(value = "1:系统用户， 2：客户用户")
 	private Integer type;
 

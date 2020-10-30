@@ -22,9 +22,8 @@
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
-
 	<!--通过角色查询菜单信息-->
-	<select id="listPermissionVOsByRoleId" resultType="com.hccake.ballcat.admin.modules.sys.model.vo.PermissionVO">
+	<select id="listPermissionVOsByRoleCode" resultType="com.hccake.ballcat.admin.modules.sys.model.vo.PermissionVO">
 		SELECT
 			m.*
 		FROM
@@ -32,20 +31,8 @@
 		LEFT JOIN sys_role_permission rm ON m.id = rm.permission_id
 		WHERE
 			m.deleted = 0
-		AND rm.role_id = #{roleId}
+		AND rm.role_code = #{roleCode}
 		ORDER BY
 			m.sort DESC
-    </select>
-
-	<!--通过角色ID 查询权限-->
-	<select id="listPermissionsByRoleIds" resultType="java.lang.String">
-        SELECT
-            m.sysPermission
-        FROM
-        	sys_permission m, sys_role_permission rm
-        WHERE
-        	m.id = rm.permission_id
-        AND m.deleted = 0
-        AND rm.role_id IN (#{roleIds})
     </select>
 </mapper>

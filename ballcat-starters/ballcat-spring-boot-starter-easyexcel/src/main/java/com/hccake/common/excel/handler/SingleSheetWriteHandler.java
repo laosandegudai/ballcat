@@ -2,13 +2,15 @@ package com.hccake.common.excel.handler;
 
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
+import com.alibaba.excel.converters.Converter;
+import com.alibaba.excel.write.builder.ExcelWriterBuilder;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.hccake.common.excel.annotation.ResponseExcel;
 import com.hccake.common.excel.config.ExcelConfigProperties;
 import com.hccake.common.excel.kit.ExcelException;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
-import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.util.StringUtils;
 
 import javax.servlet.http.HttpServletResponse;
@@ -20,11 +22,12 @@ import java.util.List;
  * <p>
  * 处理单sheet 页面
  */
-@Component
 @RequiredArgsConstructor
 public class SingleSheetWriteHandler extends AbstractSheetWriteHandler {
 
 	private final ExcelConfigProperties configProperties;
+
+	private final ObjectProvider<List<Converter<?>>> converterProvider;
 
 	/**
 	 * obj 是List 且list不为空同时list中的元素不是是List 才返回true
@@ -54,6 +57,11 @@ public class SingleSheetWriteHandler extends AbstractSheetWriteHandler {
 
 		excelWriter.write(list, sheet);
 		excelWriter.finish();
+	}
+
+	@Override
+	public void registerCustomConverter(ExcelWriterBuilder builder) {
+		converterProvider.ifAvailable(converters -> converters.forEach(builder::registerConverter));
 	}
 
 }
