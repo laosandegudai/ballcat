@@ -14,6 +14,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.baomidou.mybatisplus.extension.toolkit.SqlHelper;
 import com.hccake.ballcat.admin.constants.SysUserConst;
 import com.hccake.ballcat.admin.modules.sys.checker.AdminUserChecker;
+import com.hccake.ballcat.admin.modules.sys.event.UserChangeEvent;
 import com.hccake.ballcat.admin.modules.sys.mapper.SysUserMapper;
 import com.hccake.ballcat.admin.modules.sys.model.converter.SysUserConverter;
 import com.hccake.ballcat.admin.modules.sys.model.dto.SysUserDTO;
@@ -30,6 +31,7 @@ import com.hccake.ballcat.common.core.util.PasswordUtil;
 import com.hccake.ballcat.common.core.vo.SelectData;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -60,6 +62,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 	private final AdminUserChecker adminUserChecker;
 
 	private final SysRoleService sysRoleService;
+
+	private final ApplicationEventPublisher publisher;
 
 	@Value("${password.secret-key}")
 	private String secretKey;
@@ -156,8 +160,11 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
 		String password = PasswordUtil.decodeAesAndEncodeBCrypt(sysUserDto.getPass(), secretKey);
 		sysUser.setPassword(password);
-
-		return SqlHelper.retBool(baseMapper.insert(sysUser));
+		boolean result = SqlHelper.retBool(baseMapper.insert(sysUser));
+		if (result) {
+			publisher.publishEvent(new UserChangeEvent(sysUser));
+		}
+		return result;
 	}
 
 	/**
@@ -274,7 +281,47 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 	 */
 	@Override
 	public List<SysUser> selectUsersByRoleCode(String roleCode) {
-		return baseMapper.selectUsersByRoleCode(roleCode);
+		return selectUsersByRoleCodes(Collections.singletonList(roleCode));
+	}
+
+	/**
+	 * 根据角色查询用户
+	 * @param roleCodes 角色标识集合
+	 * @return List<SysUser>
+	 */
+	@Override
+	public List<SysUser> selectUsersByRoleCodes(List<String> roleCodes) {
+		return baseMapper.selectUsersByRoleCodes(roleCodes);
+	}
+
+	/**
+	 * 根据组织机构ID查询用户
+	 * @param organizationIds 组织机构id集合
+	 * @return 用户集合
+	 */
+	@Override
+	public List<SysUser> selectUsersByOrganizationIds(List<Integer> organizationIds) {
+		return baseMapper.selectList(Wrappers.<SysUser>lambdaQuery().in(SysUser::getOrganizationId, organizationIds));
+	}
+
+	/**
+	 * 根据用户类型查询用户
+	 * @param userTypes 用户类型集合
+	 * @return 用户集合
+	 */
+	@Override
+	public List<SysUser> selectUsersByUserTypes(List<Integer> userTypes) {
+		return baseMapper.selectList(Wrappers.<SysUser>lambdaQuery().in(SysUser::getType, userTypes));
+	}
+
+	/**
+	 * 根据用户Id集合查询用户
+	 * @param userIds 用户Id集合
+	 * @return 用户集合
+	 */
+	@Override
+	public List<SysUser> selectUsersByUserIds(List<Integer> userIds) {
+		return baseMapper.selectList(Wrappers.<SysUser>lambdaQuery().in(SysUser::getUserId, userIds));
 	}
 
 	/**
@@ -285,6 +332,16 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 	@Override
 	public List<SelectData<?>> getSelectData(List<Integer> userTypes) {
 		return baseMapper.getSelectData(userTypes);
+	}
+
+	/**
+	 * 获取用户的角色Code集合
+	 * @param userId 用户id
+	 * @return List<String>
+	 */
+	@Override
+	public List<String> getUserRoleCodes(Integer userId) {
+		return sysUserRoleService.getRoles(userId).stream().map(SysRole::getCode).collect(Collectors.toList());
 	}
 
 }
